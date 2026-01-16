@@ -15,6 +15,7 @@ const uiState = {
     activeSection: 'lips', // 'lips', 'eyes', 'face'
     presetIndex: 0,
     showOriginal: false,
+    zoomToFace: false,
 
     // Global controls
     opacity: 0.5,
@@ -54,6 +55,13 @@ function renderUI() {
             <div class="original-toggle">
                 <button id="showOriginalBtn" class="show-original-btn ${uiState.showOriginal ? 'active' : ''}">
                     👁️ ${uiState.showOriginal ? 'Show Makeup' : 'Show Original'}
+                </button>
+            </div>
+            
+            <!-- Zoom Toggle -->
+            <div class="zoom-toggle">
+                <button id="zoomFaceBtn" class="zoom-face-btn ${uiState.zoomToFace ? 'active' : ''}">
+                    🔍 ${uiState.zoomToFace ? 'Full View' : 'Zoom Face'}
                 </button>
             </div>
 
@@ -123,6 +131,14 @@ function renderDetailPanel(section) {
                 <div class="color-picker-wrapper">
                     <input type="color" id="lipsColor" value="#CC3366">
                 </div>
+                <div class="color-swatches" data-target="lipsColor" data-effect="lipstick">
+                    <button class="swatch" style="background:#CC3366" data-color="#CC3366" title="Classic Red"></button>
+                    <button class="swatch" style="background:#E85D75" data-color="#E85D75" title="Rose Pink"></button>
+                    <button class="swatch" style="background:#C4837A" data-color="#C4837A" title="Nude"></button>
+                    <button class="swatch" style="background:#8B2252" data-color="#8B2252" title="Berry"></button>
+                    <button class="swatch" style="background:#D4456A" data-color="#D4456A" title="Coral"></button>
+                    <button class="swatch" style="background:#A0522D" data-color="#A0522D" title="Brown"></button>
+                </div>
             </div>
             <div class="detail-group">
                 <label>Opacity <span id="lipsOpacityValue">50%</span></label>
@@ -154,6 +170,13 @@ function renderDetailPanel(section) {
                 <div class="color-picker-wrapper">
                     <input type="color" id="eyelinerColor" value="#1a1a1a">
                 </div>
+                <div class="color-swatches" data-target="eyelinerColor" data-effect="eyeliner">
+                    <button class="swatch" style="background:#1a1a1a" data-color="#1a1a1a" title="Black"></button>
+                    <button class="swatch" style="background:#3D2314" data-color="#3D2314" title="Brown"></button>
+                    <button class="swatch" style="background:#1E3A5F" data-color="#1E3A5F" title="Navy"></button>
+                    <button class="swatch" style="background:#2F4F4F" data-color="#2F4F4F" title="Gray"></button>
+                    <button class="swatch" style="background:#4B0082" data-color="#4B0082" title="Purple"></button>
+                </div>
             </div>
             
             <div class="divider-small"></div>
@@ -163,6 +186,14 @@ function renderDetailPanel(section) {
                 <label>Color</label>
                 <div class="color-picker-wrapper">
                     <input type="color" id="eyeshadowColor" value="#8B4B8B">
+                </div>
+                <div class="color-swatches" data-target="eyeshadowColor" data-effect="eyeshadow">
+                    <button class="swatch" style="background:#8B4B8B" data-color="#8B4B8B" title="Plum"></button>
+                    <button class="swatch" style="background:#C9A86C" data-color="#C9A86C" title="Gold"></button>
+                    <button class="swatch" style="background:#8B6B5B" data-color="#8B6B5B" title="Bronze"></button>
+                    <button class="swatch" style="background:#2F4F4F" data-color="#2F4F4F" title="Smoky"></button>
+                    <button class="swatch" style="background:#E8B4B8" data-color="#E8B4B8" title="Rose"></button>
+                    <button class="swatch" style="background:#4169E1" data-color="#4169E1" title="Blue"></button>
                 </div>
             </div>
             <div class="detail-group">
@@ -187,6 +218,13 @@ function renderDetailPanel(section) {
                 <div class="color-picker-wrapper">
                     <input type="color" id="blushColor" value="#E8A0A0">
                 </div>
+                <div class="color-swatches" data-target="blushColor" data-effect="blush">
+                    <button class="swatch" style="background:#E8A0A0" data-color="#E8A0A0" title="Soft Pink"></button>
+                    <button class="swatch" style="background:#FFAA88" data-color="#FFAA88" title="Peach"></button>
+                    <button class="swatch" style="background:#C87A8A" data-color="#C87A8A" title="Rose"></button>
+                    <button class="swatch" style="background:#E8887A" data-color="#E8887A" title="Coral"></button>
+                    <button class="swatch" style="background:#D4A5A5" data-color="#D4A5A5" title="Mauve"></button>
+                </div>
             </div>
             <div class="detail-group">
                 <label>Opacity <span id="blushOpacityValue">25%</span></label>
@@ -201,6 +239,12 @@ function renderDetailPanel(section) {
                 <div class="color-picker-wrapper">
                     <input type="color" id="contourColor" value="#8B6B5B">
                 </div>
+                <div class="color-swatches" data-target="contourColor" data-effect="contour">
+                    <button class="swatch" style="background:#8B6B5B" data-color="#8B6B5B" title="Medium"></button>
+                    <button class="swatch" style="background:#6B4B3B" data-color="#6B4B3B" title="Deep"></button>
+                    <button class="swatch" style="background:#A08070" data-color="#A08070" title="Light"></button>
+                    <button class="swatch" style="background:#5C4033" data-color="#5C4033" title="Dark"></button>
+                </div>
             </div>
         `;
     }
@@ -214,8 +258,16 @@ function setupEventListeners() {
     document.getElementById('showOriginalBtn')?.addEventListener('click', (e) => {
         uiState.showOriginal = !uiState.showOriginal;
         e.target.classList.toggle('active');
-        e.target.innerHTML = `👁️ ${uiState.showOriginal ? 'Show Makeup' : 'Show Original'}`;
+        e.target.innerHTML = `👁️ ${uiState.showOriginal ? 'Show Makeup' : 'Show Original'} `;
         if (appInstance) appInstance.setShowOriginal(uiState.showOriginal);
+    });
+
+    // Zoom to Face
+    document.getElementById('zoomFaceBtn')?.addEventListener('click', (e) => {
+        uiState.zoomToFace = !uiState.zoomToFace;
+        e.target.classList.toggle('active');
+        e.target.innerHTML = `🔍 ${uiState.zoomToFace ? 'Full View' : 'Zoom Face'}`;
+        if (appInstance) appInstance.setZoomToFace(uiState.zoomToFace);
     });
 
     // Category Tabs (switching view)
@@ -329,6 +381,25 @@ function setupDetailListeners() {
             appInstance.setMakeup('contour', { color: e.target.value });
         });
     }
+
+    // Color Swatches (universal handler)
+    document.querySelectorAll('.color-swatches').forEach(container => {
+        const targetId = container.dataset.target;
+        const effectName = container.dataset.effect;
+        const colorInput = document.getElementById(targetId);
+
+        container.querySelectorAll('.swatch').forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                const color = swatch.dataset.color;
+                if (colorInput) colorInput.value = color;
+                if (appInstance) appInstance.setMakeup(effectName, { color });
+
+                // Visual feedback - highlight selected swatch
+                container.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+                swatch.classList.add('selected');
+            });
+        });
+    });
 }
 
 /**
@@ -370,7 +441,7 @@ function applyPreset(presetName) {
 
 export function updateStatus(message) {
     if (statusElement) statusElement.textContent = message;
-    console.log(`Status: ${message}`);
+    console.log(`Status: ${message} `);
 }
 
 export default { initUI, updateStatus };

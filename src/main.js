@@ -33,6 +33,8 @@ class FaceMakeupApp {
         this.imageScale = 1;
         this.originalDimensions = { width: 0, height: 0 };
         this.faceLandmarks = null;
+        this.zoomToFace = false;
+        this.faceBounds = null;
 
         // FaceMesh detector
         this.detector = getDetector();
@@ -143,10 +145,14 @@ class FaceMakeupApp {
                 console.log(`Detected ${this.faceLandmarks.length} landmarks`);
                 updateStatus(`Face detected - ${this.faceLandmarks.length} landmarks`);
 
+                // Calculate face bounding box for zoom feature
+                this.faceBounds = this.calculateFaceBounds(this.faceLandmarks);
+
                 // Draw overlays
                 this.drawOverlays();
             } else {
                 this.faceLandmarks = null;
+                this.faceBounds = null;
                 updateStatus('No face detected - try another image');
             }
 
@@ -154,6 +160,36 @@ class FaceMakeupApp {
             console.error('Face detection failed:', error);
             updateStatus('Face detection failed');
         }
+    }
+
+    /**
+     * Calculate bounding box around face landmarks
+     */
+    calculateFaceBounds(landmarks) {
+        if (!landmarks || landmarks.length === 0) return null;
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        landmarks.forEach(point => {
+            minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.y);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+        });
+
+        // Add padding (30% on each side)
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const padX = width * 0.3;
+        const padY = height * 0.3;
+
+        return {
+            x: Math.max(0, minX - padX),
+            y: Math.max(0, minY - padY),
+            width: width + padX * 2,
+            height: height + padY * 2
+        };
     }
 
     renderImage() {
@@ -165,11 +201,25 @@ class FaceMakeupApp {
         const maxWidth = viewportRect.width - padding * 2;
         const maxHeight = viewportRect.height - padding * 2;
 
+        // Determine source region (full image or face bounds)
+        let srcX = 0, srcY = 0;
+        let srcWidth = this.currentImage.width;
+        let srcHeight = this.currentImage.height;
+
+        if (this.zoomToFace && this.faceBounds) {
+            // Use face bounds as source region
+            srcX = this.faceBounds.x;
+            srcY = this.faceBounds.y;
+            srcWidth = this.faceBounds.width;
+            srcHeight = this.faceBounds.height;
+
+            // Clamp to image bounds
+            srcWidth = Math.min(srcWidth, this.currentImage.width - srcX);
+            srcHeight = Math.min(srcHeight, this.currentImage.height - srcY);
+        }
+
         // Get safe dimensions (handle very large images)
-        const safeDims = getSafeDimensions(
-            this.currentImage.width,
-            this.currentImage.height
-        );
+        const safeDims = getSafeDimensions(srcWidth, srcHeight);
 
         // Fit to viewport while maintaining aspect ratio
         const fitDims = getFitDimensions(
@@ -179,23 +229,23 @@ class FaceMakeupApp {
             maxHeight
         );
 
-        // Calculate total scale factor from original
-        this.imageScale = safeDims.scale * fitDims.scale;
+        // Calculate total scale factor from source
+        this.imageScale = (fitDims.width / srcWidth);
 
         // Set canvas to fitted dimensions
         this.canvas.width = fitDims.width;
         this.canvas.height = fitDims.height;
 
-        // Draw the image
+        // Draw the image (or cropped portion for zoom)
         this.ctx.drawImage(
             this.currentImage,
-            0, 0,
-            this.currentImage.width, this.currentImage.height,
+            srcX, srcY,
+            srcWidth, srcHeight,
             0, 0,
             fitDims.width, fitDims.height
         );
 
-        console.log(`Rendered at ${fitDims.width}x${fitDims.height} (scale: ${this.imageScale.toFixed(3)})`);
+        console.log(`Rendered at ${fitDims.width}x${fitDims.height} (zoom: ${this.zoomToFace})`);
     }
 
     /**
@@ -204,35 +254,62 @@ class FaceMakeupApp {
     drawOverlays() {
         if (!this.faceLandmarks) return;
 
+        // Get transformed landmarks for zoom mode
+        const displayLandmarks = this.getDisplayLandmarks();
+
         // Apply makeup effects in correct order (back to front)
-        this.applyMakeup();
+        this.applyMakeup(displayLandmarks);
 
         // Draw debug landmarks (on top of makeup)
-        drawDebugLandmarks(this.ctx, this.faceLandmarks, this.imageScale);
+        drawDebugLandmarks(this.ctx, displayLandmarks, 1); // Scale already applied
+    }
+
+    /**
+     * Get landmarks transformed for current view (handles zoom offset)
+     */
+    getDisplayLandmarks() {
+        if (!this.faceLandmarks) return null;
+
+        if (this.zoomToFace && this.faceBounds) {
+            // Offset landmarks by crop position and scale
+            return this.faceLandmarks.map(point => ({
+                x: (point.x - this.faceBounds.x) * this.imageScale,
+                y: (point.y - this.faceBounds.y) * this.imageScale,
+                z: point.z
+            }));
+        } else {
+            // Just scale landmarks
+            return this.faceLandmarks.map(point => ({
+                x: point.x * this.imageScale,
+                y: point.y * this.imageScale,
+                z: point.z
+            }));
+        }
     }
 
     /**
      * Apply all makeup effects in correct order
      */
-    applyMakeup() {
+    applyMakeup(landmarks) {
+        if (!landmarks) return;
         const { width, height } = this.canvas;
 
         // Skin smoothing first (base layer)
         this.effects.skinSmoothing.apply(
-            this.ctx, this.currentImage, this.faceLandmarks, width, height, this.imageScale
+            this.ctx, this.currentImage, landmarks, width, height, 1
         );
 
         // Face effects (contour, highlight, blush)
-        this.effects.contour.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
-        this.effects.highlight.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
-        this.effects.blush.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.contour.apply(this.ctx, landmarks, width, height, 1);
+        this.effects.highlight.apply(this.ctx, landmarks, width, height, 1);
+        this.effects.blush.apply(this.ctx, landmarks, width, height, 1);
 
         // Eye effects
-        this.effects.eyeshadow.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
-        this.effects.eyeliner.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.eyeshadow.apply(this.ctx, landmarks, width, height, 1);
+        this.effects.eyeliner.apply(this.ctx, landmarks, width, height, 1);
 
         // Lip effects last
-        this.effects.lipstick.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.lipstick.apply(this.ctx, landmarks, width, height, 1);
     }
 
     /**
@@ -271,6 +348,16 @@ class FaceMakeupApp {
             this.redraw();
         } else {
             this.initializeCanvas();
+        }
+    }
+
+    /**
+     * Toggle zoom to face mode
+     */
+    setZoomToFace(enabled) {
+        this.zoomToFace = enabled;
+        if (this.currentImage) {
+            this.redraw();
         }
     }
 
