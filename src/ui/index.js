@@ -1,24 +1,27 @@
 /**
- * UI Module - Minimal Design
+ * UI Module - Minimal Design with Detail Tabs
  * 
  * Separated UI logic from rendering.
- * Mobile-first layout with simple controls.
+ * Mobile-first tabbed interface.
  */
+
+import { getPresetList, applyPresetToApp } from '../effects/presets.js';
 
 let appInstance = null;
 let statusElement = null;
 
-// UI State (separated from rendering)
+// UI State
 const uiState = {
-    activeSection: 'lips',
+    activeSection: 'lips', // 'lips', 'eyes', 'face'
     presetIndex: 0,
+    showOriginal: false,
 
     // Global controls
     opacity: 0.5,
     intensity: 1.0,
     saturation: 1.0,
 
-    // Effect toggles
+    // Category Toggles (Master switches)
     lipsEnabled: true,
     eyesEnabled: true,
     faceEnabled: false
@@ -31,11 +34,11 @@ export function initUI(app) {
     appInstance = app;
     renderUI();
     setupEventListeners();
-    console.log('Minimal UI initialized');
+    console.log('UI with Tabs initialized');
 }
 
 /**
- * Render the UI structure
+ * Render the full UI structure
  */
 function renderUI() {
     const sidebar = document.getElementById('sidebar');
@@ -47,157 +50,284 @@ function renderUI() {
                 <span id="statusText">Ready</span>
             </div>
             
-            <!-- Effect Toggles -->
-            <div class="toggle-row">
-                <button class="effect-toggle ${uiState.lipsEnabled ? 'active' : ''}" data-effect="lips">
-                    💋 Lips
-                </button>
-                <button class="effect-toggle ${uiState.eyesEnabled ? 'active' : ''}" data-effect="eyes">
-                    👁️ Eyes
-                </button>
-                <button class="effect-toggle ${uiState.faceEnabled ? 'active' : ''}" data-effect="face">
-                    ✨ Face
+            <!-- Show Original Toggle -->
+            <div class="original-toggle">
+                <button id="showOriginalBtn" class="show-original-btn ${uiState.showOriginal ? 'active' : ''}">
+                    👁️ ${uiState.showOriginal ? 'Show Makeup' : 'Show Original'}
                 </button>
             </div>
+
+            <!-- Category Tabs -->
+            <div class="tabs-row">
+                <button class="tab-btn ${uiState.activeSection === 'lips' ? 'active' : ''}" data-tab="lips">
+                    <span class="tab-icon">💋</span>
+                    <span class="tab-label">Lips</span>
+                    <label class="tab-switch">
+                        <input type="checkbox" class="category-toggle" data-category="lips" ${uiState.lipsEnabled ? 'checked' : ''}>
+                        <span class="slider round"></span>
+                    </label>
+                </button>
+                <button class="tab-btn ${uiState.activeSection === 'eyes' ? 'active' : ''}" data-tab="eyes">
+                    <span class="tab-icon">👁️</span>
+                    <span class="tab-label">Eyes</span>
+                    <label class="tab-switch">
+                        <input type="checkbox" class="category-toggle" data-category="eyes" ${uiState.eyesEnabled ? 'checked' : ''}>
+                        <span class="slider round"></span>
+                    </label>
+                </button>
+                <button class="tab-btn ${uiState.activeSection === 'face' ? 'active' : ''}" data-tab="face">
+                    <span class="tab-icon">✨</span>
+                    <span class="tab-label">Face</span>
+                    <label class="tab-switch">
+                        <input type="checkbox" class="category-toggle" data-category="face" ${uiState.faceEnabled ? 'checked' : ''}>
+                        <span class="slider round"></span>
+                    </label>
+                </button>
+            </div>
+
+            <!-- Detail Panel -->
+            <div class="detail-panel" id="detailPanel">
+                ${renderDetailPanel(uiState.activeSection)}
+            </div>
             
+            <div class="divider"></div>
+
             <!-- Preset Selector -->
-            <div class="preset-row">
-                <label>Preset</label>
+            <div class="control-row">
+                <label>Look</label>
                 <select id="presetSelector">
-                    <option value="natural">Natural</option>
-                    <option value="glam">Glam</option>
-                    <option value="bold">Bold</option>
-                    <option value="subtle">Subtle</option>
-                    <option value="custom">Custom</option>
+                    <option value="natural">🌿 Natural</option>
+                    <option value="glam">✨ Glam</option>
+                    <option value="bridal">💒 Bridal</option>
+                    <option value="party">🎉 Party</option>
+                    <option value="none">❌ None</option>
                 </select>
-            </div>
-            
-            <!-- Global Sliders -->
-            <div class="slider-group">
-                <div class="slider-row">
-                    <label>Opacity</label>
-                    <input type="range" id="globalOpacity" min="0" max="100" value="50">
-                    <span class="value-display" id="opacityValue">50%</span>
-                </div>
-                
-                <div class="slider-row">
-                    <label>Intensity</label>
-                    <input type="range" id="globalIntensity" min="0" max="100" value="100">
-                    <span class="value-display" id="intensityValue">100%</span>
-                </div>
-                
-                <div class="slider-row">
-                    <label>Saturation</label>
-                    <input type="range" id="globalSaturation" min="0" max="100" value="100">
-                    <span class="value-display" id="saturationValue">100%</span>
-                </div>
             </div>
         </div>
     `;
 
     statusElement = document.getElementById('statusText');
+
+    // Re-attach listeners for the dynamically rendered detail panel
+    setupDetailListeners();
 }
 
 /**
- * Setup event listeners
+ * Render content for the active detail panel
+ */
+function renderDetailPanel(section) {
+    if (section === 'lips') {
+        return `
+            <div class="detail-group">
+                <label>Lipstick Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="lipsColor" value="#CC3366">
+                </div>
+            </div>
+            <div class="detail-group">
+                <label>Opacity <span id="lipsOpacityValue">50%</span></label>
+                <input type="range" id="lipsOpacity" min="0" max="100" value="50">
+            </div>
+            <div class="detail-group">
+                <label>Blend Mode</label>
+                <select id="lipsBlend">
+                    <option value="soft-light">Natural</option>
+                    <option value="multiply">Darken</option>
+                    <option value="overlay">Vibrant</option>
+                </select>
+            </div>
+        `;
+    }
+    else if (section === 'eyes') {
+        return `
+            <h4>Eyeliner</h4>
+            <div class="detail-group">
+                <label>Style</label>
+                <select id="eyelinerStyle">
+                    <option value="simple">Simple</option>
+                    <option value="winged">Winged</option>
+                    <option value="thick">Thick</option>
+                </select>
+            </div>
+            <div class="detail-group">
+                <label>Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="eyelinerColor" value="#1a1a1a">
+                </div>
+            </div>
+            
+            <div class="divider-small"></div>
+            
+            <h4>Eyeshadow</h4>
+            <div class="detail-group">
+                <label>Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="eyeshadowColor" value="#8B4B8B">
+                </div>
+            </div>
+            <div class="detail-group">
+                <label>Opacity <span id="eyeshadowOpacityValue">35%</span></label>
+                <input type="range" id="eyeshadowOpacity" min="0" max="100" value="35">
+            </div>
+        `;
+    }
+    else if (section === 'face') {
+        return `
+            <h4>Skin Smoothing</h4>
+            <div class="detail-group">
+                <label>Strength <span id="skinStrengthValue">30%</span></label>
+                <input type="range" id="skinStrength" min="0" max="100" value="30">
+            </div>
+            
+            <div class="divider-small"></div>
+            
+            <h4>Blush</h4>
+            <div class="detail-group">
+                <label>Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="blushColor" value="#E8A0A0">
+                </div>
+            </div>
+            <div class="detail-group">
+                <label>Opacity <span id="blushOpacityValue">25%</span></label>
+                <input type="range" id="blushOpacity" min="0" max="100" value="25">
+            </div>
+            
+            <div class="divider-small"></div>
+            
+            <h4>Contour & Highlight</h4>
+             <div class="detail-group">
+                <label>Contour Color</label>
+                <div class="color-picker-wrapper">
+                    <input type="color" id="contourColor" value="#8B6B5B">
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Setup global and static event listeners
  */
 function setupEventListeners() {
-    // Effect toggles
-    document.querySelectorAll('.effect-toggle').forEach(btn => {
+    // Show Original
+    document.getElementById('showOriginalBtn')?.addEventListener('click', (e) => {
+        uiState.showOriginal = !uiState.showOriginal;
+        e.target.classList.toggle('active');
+        e.target.innerHTML = `👁️ ${uiState.showOriginal ? 'Show Makeup' : 'Show Original'}`;
+        if (appInstance) appInstance.setShowOriginal(uiState.showOriginal);
+    });
+
+    // Category Tabs (switching view)
+    document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const effect = e.target.dataset.effect;
-            toggleEffect(effect);
-            e.target.classList.toggle('active');
+            // Ignore if clicked on the switch itself
+            if (e.target.closest('.tab-switch')) return;
+
+            // Switch active tab
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            uiState.activeSection = btn.dataset.tab;
+
+            // Re-render detail panel
+            const panel = document.getElementById('detailPanel');
+            panel.innerHTML = renderDetailPanel(uiState.activeSection);
+
+            // Setup listeners for new elements
+            setupDetailListeners();
         });
     });
 
-    // Preset selector
+    // Category Toggles (Enable/Disable)
+    document.querySelectorAll('.category-toggle').forEach(toggle => {
+        toggle.addEventListener('change', (e) => {
+            const category = e.target.dataset.category;
+            const enabled = e.target.checked;
+
+            if (category === 'lips') {
+                uiState.lipsEnabled = enabled;
+                appInstance?.setMakeup('lipstick', { enabled });
+            } else if (category === 'eyes') {
+                uiState.eyesEnabled = enabled;
+                appInstance?.setMakeup('eyeliner', { enabled });
+                appInstance?.setMakeup('eyeshadow', { enabled });
+            } else if (category === 'face') {
+                uiState.faceEnabled = enabled;
+                appInstance?.setMakeup('blush', { enabled });
+                appInstance?.setMakeup('contour', { enabled });
+                appInstance?.setMakeup('highlight', { enabled });
+                appInstance?.setMakeup('skinSmoothing', { enabled });
+            }
+        });
+    });
+
+    // Preset Selector
     document.getElementById('presetSelector')?.addEventListener('change', (e) => {
         applyPreset(e.target.value);
     });
-
-    // Global sliders
-    setupSlider('globalOpacity', 'opacityValue', (value) => {
-        uiState.opacity = value / 100;
-        applyGlobalSettings();
-    });
-
-    setupSlider('globalIntensity', 'intensityValue', (value) => {
-        uiState.intensity = value / 100;
-        applyGlobalSettings();
-    });
-
-    setupSlider('globalSaturation', 'saturationValue', (value) => {
-        uiState.saturation = value / 100;
-        applyGlobalSettings();
-    });
 }
 
 /**
- * Setup individual slider
+ * Setup listeners for dynamic detail panel elements
  */
-function setupSlider(sliderId, displayId, onChange) {
-    const slider = document.getElementById(sliderId);
-    const display = document.getElementById(displayId);
-
-    if (!slider) return;
-
-    slider.addEventListener('input', (e) => {
-        const value = parseInt(e.target.value);
-        if (display) display.textContent = `${value}%`;
-        onChange(value);
-    });
-}
-
-/**
- * Toggle effect on/off
- */
-function toggleEffect(effect) {
+function setupDetailListeners() {
     if (!appInstance) return;
 
-    switch (effect) {
-        case 'lips':
-            uiState.lipsEnabled = !uiState.lipsEnabled;
-            appInstance.setMakeup('lipstick', { enabled: uiState.lipsEnabled });
-            break;
-        case 'eyes':
-            uiState.eyesEnabled = !uiState.eyesEnabled;
-            appInstance.setMakeup('eyeliner', { enabled: uiState.eyesEnabled });
-            appInstance.setMakeup('eyeshadow', { enabled: uiState.eyesEnabled });
-            break;
-        case 'face':
-            uiState.faceEnabled = !uiState.faceEnabled;
-            appInstance.setMakeup('blush', { enabled: uiState.faceEnabled });
-            appInstance.setMakeup('contour', { enabled: uiState.faceEnabled });
-            appInstance.setMakeup('highlight', { enabled: uiState.faceEnabled });
-            appInstance.setMakeup('skinSmoothing', { enabled: uiState.faceEnabled });
-            break;
+    // LIPS
+    if (uiState.activeSection === 'lips') {
+        document.getElementById('lipsColor')?.addEventListener('input', (e) => {
+            appInstance.setMakeup('lipstick', { color: e.target.value });
+        });
+        document.getElementById('lipsOpacity')?.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('lipsOpacityValue').textContent = val + '%';
+            appInstance.setMakeup('lipstick', { opacity: val / 100 });
+        });
+        document.getElementById('lipsBlend')?.addEventListener('change', (e) => {
+            appInstance.setMakeup('lipstick', { blendMode: e.target.value });
+        });
     }
-}
 
-/**
- * Apply global settings to all effects
- */
-function applyGlobalSettings() {
-    if (!appInstance) return;
+    // EYES
+    else if (uiState.activeSection === 'eyes') {
+        document.getElementById('eyelinerStyle')?.addEventListener('change', (e) => {
+            appInstance.setMakeup('eyeliner', { style: e.target.value });
+        });
+        document.getElementById('eyelinerColor')?.addEventListener('input', (e) => {
+            appInstance.setMakeup('eyeliner', { color: e.target.value });
+        });
 
-    const settings = {
-        opacity: uiState.opacity,
-        intensity: uiState.saturation
-    };
-
-    // Apply to all active effects
-    if (uiState.lipsEnabled) {
-        appInstance.setMakeup('lipstick', settings);
+        document.getElementById('eyeshadowColor')?.addEventListener('input', (e) => {
+            appInstance.setMakeup('eyeshadow', { color: e.target.value });
+        });
+        document.getElementById('eyeshadowOpacity')?.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('eyeshadowOpacityValue').textContent = val + '%';
+            appInstance.setMakeup('eyeshadow', { opacity: val / 100 });
+        });
     }
-    if (uiState.eyesEnabled) {
-        appInstance.setMakeup('eyeliner', { opacity: uiState.opacity });
-        appInstance.setMakeup('eyeshadow', settings);
-    }
-    if (uiState.faceEnabled) {
-        appInstance.setMakeup('blush', settings);
-        appInstance.setMakeup('contour', { opacity: uiState.opacity });
-        appInstance.setMakeup('highlight', { opacity: uiState.opacity });
+
+    // FACE
+    else if (uiState.activeSection === 'face') {
+        document.getElementById('skinStrength')?.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('skinStrengthValue').textContent = val + '%';
+            appInstance.setMakeup('skinSmoothing', { strength: val / 100 });
+        });
+
+        document.getElementById('blushColor')?.addEventListener('input', (e) => {
+            appInstance.setMakeup('blush', { color: e.target.value });
+        });
+        document.getElementById('blushOpacity')?.addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('blushOpacityValue').textContent = val + '%';
+            appInstance.setMakeup('blush', { opacity: val / 100 });
+        });
+
+        document.getElementById('contourColor')?.addEventListener('input', (e) => {
+            appInstance.setMakeup('contour', { color: e.target.value });
+        });
     }
 }
 
@@ -207,56 +337,40 @@ function applyGlobalSettings() {
 function applyPreset(presetName) {
     if (!appInstance) return;
 
-    const presets = {
-        natural: { opacity: 30, intensity: 80, saturation: 70 },
-        glam: { opacity: 70, intensity: 100, saturation: 100 },
-        bold: { opacity: 80, intensity: 100, saturation: 120 },
-        subtle: { opacity: 20, intensity: 60, saturation: 80 },
-        custom: null
-    };
+    const success = applyPresetToApp(appInstance, presetName);
 
-    const preset = presets[presetName];
-    if (!preset) return;
+    if (success) {
+        // Update toggles based on preset logic (simplified)
+        // Ideally we would read back from app state
+        if (presetName === 'none') {
+            uiState.lipsEnabled = false;
+            uiState.eyesEnabled = false;
+            uiState.faceEnabled = false;
+        } else {
+            uiState.lipsEnabled = true;
+            uiState.eyesEnabled = true;
+            uiState.faceEnabled = true;
+        }
 
-    // Update sliders
-    updateSlider('globalOpacity', 'opacityValue', preset.opacity);
-    updateSlider('globalIntensity', 'intensityValue', preset.intensity);
-    updateSlider('globalSaturation', 'saturationValue', preset.saturation);
+        // Update checkbox states visually
+        document.querySelectorAll('.category-toggle').forEach(cb => {
+            const cat = cb.dataset.category;
+            if (cat === 'lips') cb.checked = uiState.lipsEnabled;
+            if (cat === 'eyes') cb.checked = uiState.eyesEnabled;
+            if (cat === 'face') cb.checked = uiState.faceEnabled;
+        });
 
-    // Update state
-    uiState.opacity = preset.opacity / 100;
-    uiState.intensity = preset.intensity / 100;
-    uiState.saturation = preset.saturation / 100;
-
-    applyGlobalSettings();
-}
-
-/**
- * Update slider value
- */
-function updateSlider(sliderId, displayId, value) {
-    const slider = document.getElementById(sliderId);
-    const display = document.getElementById(displayId);
-
-    if (slider) slider.value = value;
-    if (display) display.textContent = `${value}%`;
-}
-
-/**
- * Update status message
- */
-export function updateStatus(message) {
-    if (statusElement) {
-        statusElement.textContent = message;
+        // Force refresh of detail panel to show new preset values (colors etc would need sync)
+        // For now just re-render to ensure consistency
+        const panel = document.getElementById('detailPanel');
+        panel.innerHTML = renderDetailPanel(uiState.activeSection);
+        setupDetailListeners();
     }
+}
+
+export function updateStatus(message) {
+    if (statusElement) statusElement.textContent = message;
     console.log(`Status: ${message}`);
 }
 
-/**
- * Get current UI state (for external access)
- */
-export function getUIState() {
-    return { ...uiState };
-}
-
-export default { initUI, updateStatus, getUIState };
+export default { initUI, updateStatus };

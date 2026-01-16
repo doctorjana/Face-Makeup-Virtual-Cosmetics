@@ -7,7 +7,7 @@
 import { REGIONS } from '../facemesh/landmarks.js';
 
 // Debug flag - set to true to visualize landmarks
-export let DEBUG = true;
+export let DEBUG = false;
 
 /**
  * Set debug mode
