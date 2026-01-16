@@ -18,6 +18,7 @@ import { EyeshadowEffect } from './effects/eyeshadow.js';
 import { BlushEffect } from './effects/blush.js';
 import { ContourEffect } from './effects/contour.js';
 import { HighlightEffect } from './effects/highlight.js';
+import { SkinSmoothingEffect } from './effects/skinSmoothing.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -38,6 +39,7 @@ class FaceMakeupApp {
 
         // Makeup effects (order matters for layering)
         this.effects = {
+            skinSmoothing: new SkinSmoothingEffect(),
             contour: new ContourEffect(),
             highlight: new HighlightEffect(),
             blush: new BlushEffect(),
@@ -215,7 +217,12 @@ class FaceMakeupApp {
     applyMakeup() {
         const { width, height } = this.canvas;
 
-        // Face effects first (contour, highlight, blush)
+        // Skin smoothing first (base layer)
+        this.effects.skinSmoothing.apply(
+            this.ctx, this.currentImage, this.faceLandmarks, width, height, this.imageScale
+        );
+
+        // Face effects (contour, highlight, blush)
         this.effects.contour.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
         this.effects.highlight.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
         this.effects.blush.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);

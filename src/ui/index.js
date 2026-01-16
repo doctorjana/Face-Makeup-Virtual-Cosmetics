@@ -30,7 +30,27 @@ export function initUI(app) {
             <label class="toggle-label">
                 <input type="checkbox" id="debugToggle" ${DEBUG ? 'checked' : ''}>
                 <span>Show Landmarks</span>
-            </label>
+        </div>
+        
+        <!-- Skin Smoothing -->
+        <div class="ui-section collapsible">
+            <h3 class="section-header" data-target="skinSmoothingControls">
+                Skin Smoothing <span class="collapse-icon">▼</span>
+            </h3>
+            <div class="section-content" id="skinSmoothingControls">
+                <label class="toggle-label">
+                    <input type="checkbox" id="skinSmoothingEnabled">
+                    <span>Enable Skin Smoothing</span>
+                </label>
+                <div class="control-group">
+                    <label>Strength <span id="skinSmoothingStrengthValue">30%</span></label>
+                    <input type="range" id="skinSmoothingStrength" min="0" max="100" value="30">
+                </div>
+                <div class="control-group">
+                    <label>Preserve Texture <span id="skinSmoothingTextureValue">50%</span></label>
+                    <input type="range" id="skinSmoothingTexture" min="0" max="100" value="50">
+                </div>
+            </div>
         </div>
         
         <!-- Face Effects -->
@@ -202,6 +222,23 @@ function setupEventListeners() {
     // Debug toggle
     document.getElementById('debugToggle').addEventListener('change', (e) => {
         if (appInstance) appInstance.setDebugMode(e.target.checked);
+    });
+
+    // Skin Smoothing
+    document.getElementById('skinSmoothingEnabled')?.addEventListener('change', (e) => {
+        if (appInstance) appInstance.setMakeup('skinSmoothing', { enabled: e.target.checked });
+    });
+
+    document.getElementById('skinSmoothingStrength')?.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        document.getElementById('skinSmoothingStrengthValue').textContent = `${value}%`;
+        if (appInstance) appInstance.setMakeup('skinSmoothing', { strength: value / 100 });
+    });
+
+    document.getElementById('skinSmoothingTexture')?.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        document.getElementById('skinSmoothingTextureValue').textContent = `${value}%`;
+        if (appInstance) appInstance.setMakeup('skinSmoothing', { preserveTexture: value / 100 });
     });
 
     // Blush
