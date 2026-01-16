@@ -11,6 +11,7 @@
 
 import { loadImage, getSafeDimensions, getFitDimensions } from './image/index.js';
 import { getDetector, FaceMeshDetector } from './facemesh/index.js';
+import { drawDebugLandmarks, setDebug, DEBUG } from './render/index.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -35,7 +36,7 @@ class FaceMakeupApp {
         this.initializeCanvas();
 
         // Initialize UI module
-        initUI();
+        initUI(this);
 
         // Pre-initialize detector (loads model in background)
         updateStatus('Loading face detection model...');
@@ -124,8 +125,8 @@ class FaceMakeupApp {
                 console.log(`Detected ${this.faceLandmarks.length} landmarks`);
                 updateStatus(`Face detected - ${this.faceLandmarks.length} landmarks`);
 
-                // Debug: Draw landmarks
-                this.drawLandmarks();
+                // Draw landmarks overlay
+                this.drawOverlays();
             } else {
                 this.faceLandmarks = null;
                 updateStatus('No face detected - try another image');
@@ -179,27 +180,38 @@ class FaceMakeupApp {
         console.log(`Rendered at ${fitDims.width}x${fitDims.height} (scale: ${this.imageScale.toFixed(3)})`);
     }
 
-    drawLandmarks() {
+    /**
+     * Draw all overlays (debug landmarks, makeup effects, etc.)
+     */
+    drawOverlays() {
         if (!this.faceLandmarks) return;
 
-        this.ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+        // Draw debug landmarks with color coding
+        drawDebugLandmarks(this.ctx, this.faceLandmarks, this.imageScale);
+    }
 
-        for (const point of this.faceLandmarks) {
-            const x = point.x * this.imageScale;
-            const y = point.y * this.imageScale;
+    /**
+     * Redraw the entire scene
+     */
+    redraw() {
+        this.renderImage();
+        this.drawOverlays();
+    }
 
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-            this.ctx.fill();
+    /**
+     * Toggle debug mode
+     * @param {boolean} enabled
+     */
+    setDebugMode(enabled) {
+        setDebug(enabled);
+        if (this.currentImage) {
+            this.redraw();
         }
     }
 
     handleResize() {
         if (this.currentImage) {
-            this.renderImage();
-            if (this.faceLandmarks) {
-                this.drawLandmarks();
-            }
+            this.redraw();
         } else {
             this.initializeCanvas();
         }
