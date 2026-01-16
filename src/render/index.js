@@ -4,13 +4,7 @@
  * Canvas rendering pipeline for face mesh visualization and makeup effects.
  */
 
-import {
-    LIPS_OUTER, LIPS_INNER,
-    LEFT_EYE, RIGHT_EYE,
-    LEFT_EYEBROW, RIGHT_EYEBROW,
-    LEFT_IRIS, RIGHT_IRIS,
-    FACE_OVAL, NOSE
-} from '../facemesh/landmarks.js';
+import { REGIONS } from '../facemesh/landmarks.js';
 
 // Debug flag - set to true to visualize landmarks
 export let DEBUG = true;
@@ -45,31 +39,31 @@ const REGION_COLORS = {
  * @returns {{region: string, color: string}}
  */
 function getLandmarkRegion(index) {
-    if (LIPS_OUTER.includes(index) || LIPS_INNER.includes(index)) {
+    if (REGIONS.lipsOuter?.includes(index) || REGIONS.upperLip?.includes(index) || REGIONS.lowerLip?.includes(index)) {
         return { region: 'lips', color: REGION_COLORS.lips };
     }
-    if (LEFT_EYE.includes(index)) {
+    if (REGIONS.leftEye?.includes(index)) {
         return { region: 'leftEye', color: REGION_COLORS.leftEye };
     }
-    if (RIGHT_EYE.includes(index)) {
+    if (REGIONS.rightEye?.includes(index)) {
         return { region: 'rightEye', color: REGION_COLORS.rightEye };
     }
-    if (LEFT_EYEBROW.includes(index)) {
+    if (REGIONS.leftEyebrow?.includes(index)) {
         return { region: 'leftEyebrow', color: REGION_COLORS.leftEyebrow };
     }
-    if (RIGHT_EYEBROW.includes(index)) {
+    if (REGIONS.rightEyebrow?.includes(index)) {
         return { region: 'rightEyebrow', color: REGION_COLORS.rightEyebrow };
     }
-    if (LEFT_IRIS.includes(index)) {
+    if (REGIONS.leftIris?.includes(index)) {
         return { region: 'leftIris', color: REGION_COLORS.leftIris };
     }
-    if (RIGHT_IRIS.includes(index)) {
+    if (REGIONS.rightIris?.includes(index)) {
         return { region: 'rightIris', color: REGION_COLORS.rightIris };
     }
-    if (FACE_OVAL.includes(index)) {
+    if (REGIONS.jawline?.includes(index)) {
         return { region: 'faceOval', color: REGION_COLORS.faceOval };
     }
-    if (NOSE.includes(index)) {
+    if (REGIONS.nose?.includes(index)) {
         return { region: 'nose', color: REGION_COLORS.nose };
     }
     return { region: 'other', color: REGION_COLORS.other };
@@ -97,11 +91,11 @@ export function drawDebugLandmarks(ctx, landmarks, scale = 1) {
     });
 
     // Draw contour connections for key regions
-    drawContour(ctx, landmarks, FACE_OVAL, REGION_COLORS.faceOval, scale, 1);
-    drawContour(ctx, landmarks, LEFT_EYE, REGION_COLORS.leftEye, scale, 1.5);
-    drawContour(ctx, landmarks, RIGHT_EYE, REGION_COLORS.rightEye, scale, 1.5);
-    drawContour(ctx, landmarks, LIPS_OUTER, REGION_COLORS.lips, scale, 1.5);
-    drawContour(ctx, landmarks, LIPS_INNER, REGION_COLORS.lips, scale, 1);
+    drawContour(ctx, landmarks, REGIONS.jawline, REGION_COLORS.faceOval, scale, 1);
+    drawContour(ctx, landmarks, REGIONS.leftEye, REGION_COLORS.leftEye, scale, 1.5);
+    drawContour(ctx, landmarks, REGIONS.rightEye, REGION_COLORS.rightEye, scale, 1.5);
+    drawContour(ctx, landmarks, REGIONS.lipsOuter, REGION_COLORS.lips, scale, 1.5);
+    drawContour(ctx, landmarks, REGIONS.upperLip, REGION_COLORS.lips, scale, 1);
 }
 
 /**
