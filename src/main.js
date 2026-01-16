@@ -35,6 +35,7 @@ class FaceMakeupApp {
         this.faceLandmarks = null;
         this.zoomToFace = false;
         this.faceBounds = null;
+        this.showOriginal = false;
 
         // FaceMesh detector
         this.detector = getDetector();
@@ -257,8 +258,10 @@ class FaceMakeupApp {
         // Get transformed landmarks for zoom mode
         const displayLandmarks = this.getDisplayLandmarks();
 
-        // Apply makeup effects in correct order (back to front)
-        this.applyMakeup(displayLandmarks);
+        // Apply makeup effects in correct order (back to front) - skip if showing original
+        if (!this.showOriginal) {
+            this.applyMakeup(displayLandmarks);
+        }
 
         // Draw debug landmarks (on top of makeup)
         drawDebugLandmarks(this.ctx, displayLandmarks, 1); // Scale already applied
@@ -356,6 +359,16 @@ class FaceMakeupApp {
      */
     setZoomToFace(enabled) {
         this.zoomToFace = enabled;
+        if (this.currentImage) {
+            this.redraw();
+        }
+    }
+
+    /**
+     * Toggle show original mode (hides makeup effects)
+     */
+    setShowOriginal(enabled) {
+        this.showOriginal = enabled;
         if (this.currentImage) {
             this.redraw();
         }

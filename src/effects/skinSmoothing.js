@@ -55,8 +55,8 @@ export function applySkinSmoothing(ctx, originalImage, landmarks, width, height,
     processCanvas.height = height;
     const processCtx = processCanvas.getContext('2d');
 
-    // Draw original image to process canvas
-    processCtx.drawImage(originalImage, 0, 0, width, height);
+    // Draw current canvas content to process canvas (preserves zoom cropping)
+    processCtx.drawImage(ctx.canvas, 0, 0);
 
     // Create smoothed version with blur
     const smoothCanvas = document.createElement('canvas');
@@ -66,7 +66,7 @@ export function applySkinSmoothing(ctx, originalImage, landmarks, width, height,
 
     // Apply blur for smoothing effect
     smoothCtx.filter = `blur(${config.blurRadius}px)`;
-    smoothCtx.drawImage(originalImage, 0, 0, width, height);
+    smoothCtx.drawImage(ctx.canvas, 0, 0);
     smoothCtx.filter = 'none';
 
     // Create skin mask (face regions minus eyes and lips)
