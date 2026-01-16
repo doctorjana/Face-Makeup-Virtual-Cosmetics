@@ -13,6 +13,8 @@ import { loadImage, getSafeDimensions, getFitDimensions } from './image/index.js
 import { getDetector, FaceMeshDetector } from './facemesh/index.js';
 import { drawDebugLandmarks, setDebug } from './render/index.js';
 import { LipstickEffect } from './effects/lipstick.js';
+import { EyelinerEffect } from './effects/eyeliner.js';
+import { EyeshadowEffect } from './effects/eyeshadow.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -33,6 +35,8 @@ class FaceMakeupApp {
 
         // Makeup effects
         this.effects = {
+            eyeshadow: new EyeshadowEffect(),
+            eyeliner: new EyelinerEffect(),
             lipstick: new LipstickEffect()
         };
     }
@@ -192,7 +196,7 @@ class FaceMakeupApp {
     drawOverlays() {
         if (!this.faceLandmarks) return;
 
-        // Apply makeup effects
+        // Apply makeup effects (order matters for layering)
         this.applyMakeup();
 
         // Draw debug landmarks (on top of makeup)
@@ -200,10 +204,28 @@ class FaceMakeupApp {
     }
 
     /**
-     * Apply all makeup effects
+     * Apply all makeup effects in correct order
      */
     applyMakeup() {
         const { width, height } = this.canvas;
+
+        // Apply eyeshadow first (behind eyeliner)
+        this.effects.eyeshadow.apply(
+            this.ctx,
+            this.faceLandmarks,
+            width,
+            height,
+            this.imageScale
+        );
+
+        // Apply eyeliner
+        this.effects.eyeliner.apply(
+            this.ctx,
+            this.faceLandmarks,
+            width,
+            height,
+            this.imageScale
+        );
 
         // Apply lipstick
         this.effects.lipstick.apply(
@@ -217,7 +239,7 @@ class FaceMakeupApp {
 
     /**
      * Update makeup settings
-     * @param {string} effectName - Name of the effect (e.g., 'lipstick')
+     * @param {string} effectName - Name of the effect
      * @param {Object} settings - Settings to update
      */
     setMakeup(effectName, settings) {
@@ -295,7 +317,9 @@ class FaceMakeupApp {
      */
     getMakeupSettings() {
         return {
-            lipstick: this.effects.lipstick.getSettings()
+            lipstick: this.effects.lipstick.getSettings(),
+            eyeliner: this.effects.eyeliner.getSettings(),
+            eyeshadow: this.effects.eyeshadow.getSettings()
         };
     }
 }
