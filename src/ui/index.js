@@ -1,357 +1,262 @@
 /**
- * UI Module
+ * UI Module - Minimal Design
  * 
- * User interface controls for makeup application.
+ * Separated UI logic from rendering.
+ * Mobile-first layout with simple controls.
  */
 
-import { DEBUG, setDebug } from '../render/index.js';
-import { LIPSTICK_PRESETS, BLEND_MODES } from '../effects/lipstick.js';
-import { EYELINER_STYLES, EYELINER_COLORS } from '../effects/eyeliner.js';
-import { EYESHADOW_PRESETS } from '../effects/eyeshadow.js';
-import { BLUSH_PRESETS } from '../effects/blush.js';
-import { CONTOUR_PRESETS } from '../effects/contour.js';
-import { HIGHLIGHT_PRESETS } from '../effects/highlight.js';
-
-let statusElement = null;
 let appInstance = null;
+let statusElement = null;
 
+// UI State (separated from rendering)
+const uiState = {
+    activeSection: 'lips',
+    presetIndex: 0,
+
+    // Global controls
+    opacity: 0.5,
+    intensity: 1.0,
+    saturation: 1.0,
+
+    // Effect toggles
+    lipsEnabled: true,
+    eyesEnabled: true,
+    faceEnabled: false
+};
+
+/**
+ * Initialize UI
+ */
 export function initUI(app) {
     appInstance = app;
+    renderUI();
+    setupEventListeners();
+    console.log('Minimal UI initialized');
+}
+
+/**
+ * Render the UI structure
+ */
+function renderUI() {
     const sidebar = document.getElementById('sidebar');
 
     sidebar.innerHTML = `
-        <div class="ui-section">
-            <h3>Status</h3>
-            <p class="status-text" id="statusText">Initializing...</p>
-        </div>
-        
-        <div class="ui-section">
-            <h3>Debug</h3>
-            <label class="toggle-label">
-                <input type="checkbox" id="debugToggle" ${DEBUG ? 'checked' : ''}>
-                <span>Show Landmarks</span>
-        </div>
-        
-        <!-- Skin Smoothing -->
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="skinSmoothingControls">
-                Skin Smoothing <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="skinSmoothingControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="skinSmoothingEnabled">
-                    <span>Enable Skin Smoothing</span>
-                </label>
-                <div class="control-group">
-                    <label>Strength <span id="skinSmoothingStrengthValue">30%</span></label>
-                    <input type="range" id="skinSmoothingStrength" min="0" max="100" value="30">
-                </div>
-                <div class="control-group">
-                    <label>Preserve Texture <span id="skinSmoothingTextureValue">50%</span></label>
-                    <input type="range" id="skinSmoothingTexture" min="0" max="100" value="50">
-                </div>
+        <div class="ui-minimal">
+            <!-- Status -->
+            <div class="status-bar">
+                <span id="statusText">Ready</span>
             </div>
-        </div>
-        
-        <!-- Face Effects -->
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="blushControls">
-                Blush <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="blushControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="blushEnabled">
-                    <span>Enable Blush</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="blushColor" value="#E8A0A0">
-                        <div class="color-presets" id="blushPresets"></div>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Opacity <span id="blushOpacityValue">25%</span></label>
-                    <input type="range" id="blushOpacity" min="0" max="100" value="25">
-                </div>
+            
+            <!-- Effect Toggles -->
+            <div class="toggle-row">
+                <button class="effect-toggle ${uiState.lipsEnabled ? 'active' : ''}" data-effect="lips">
+                    💋 Lips
+                </button>
+                <button class="effect-toggle ${uiState.eyesEnabled ? 'active' : ''}" data-effect="eyes">
+                    👁️ Eyes
+                </button>
+                <button class="effect-toggle ${uiState.faceEnabled ? 'active' : ''}" data-effect="face">
+                    ✨ Face
+                </button>
             </div>
-        </div>
-        
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="contourControls">
-                Contour <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="contourControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="contourEnabled">
-                    <span>Enable Contour</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="contourColor" value="#8B6B5B">
-                        <div class="color-presets" id="contourPresets"></div>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Opacity <span id="contourOpacityValue">20%</span></label>
-                    <input type="range" id="contourOpacity" min="0" max="100" value="20">
-                </div>
+            
+            <!-- Preset Selector -->
+            <div class="preset-row">
+                <label>Preset</label>
+                <select id="presetSelector">
+                    <option value="natural">Natural</option>
+                    <option value="glam">Glam</option>
+                    <option value="bold">Bold</option>
+                    <option value="subtle">Subtle</option>
+                    <option value="custom">Custom</option>
+                </select>
             </div>
-        </div>
-        
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="highlightControls">
-                Highlight <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="highlightControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="highlightEnabled">
-                    <span>Enable Highlight</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="highlightColor" value="#FFFFFF">
-                        <div class="color-presets" id="highlightPresets"></div>
-                    </div>
+            
+            <!-- Global Sliders -->
+            <div class="slider-group">
+                <div class="slider-row">
+                    <label>Opacity</label>
+                    <input type="range" id="globalOpacity" min="0" max="100" value="50">
+                    <span class="value-display" id="opacityValue">50%</span>
                 </div>
-                <div class="control-group">
-                    <label>Opacity <span id="highlightOpacityValue">15%</span></label>
-                    <input type="range" id="highlightOpacity" min="0" max="100" value="15">
+                
+                <div class="slider-row">
+                    <label>Intensity</label>
+                    <input type="range" id="globalIntensity" min="0" max="100" value="100">
+                    <span class="value-display" id="intensityValue">100%</span>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Eye Effects -->
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="eyeshadowControls">
-                Eyeshadow <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="eyeshadowControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="eyeshadowEnabled">
-                    <span>Enable Eyeshadow</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="eyeshadowColor" value="#8B4B8B">
-                        <div class="color-presets" id="eyeshadowPresets"></div>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Opacity <span id="eyeshadowOpacityValue">35%</span></label>
-                    <input type="range" id="eyeshadowOpacity" min="0" max="100" value="35">
-                </div>
-            </div>
-        </div>
-        
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="eyelinerControls">
-                Eyeliner <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="eyelinerControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="eyelinerEnabled" checked>
-                    <span>Enable Eyeliner</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="eyelinerColor" value="#1a1a1a">
-                        <div class="color-presets" id="eyelinerPresets"></div>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Thickness <span id="eyelinerThicknessValue">2px</span></label>
-                    <input type="range" id="eyelinerThickness" min="1" max="8" value="2">
-                </div>
-                <div class="control-group">
-                    <label>Style</label>
-                    <select id="eyelinerStyle">
-                        ${EYELINER_STYLES.map(s =>
-        `<option value="${s.value}">${s.label}</option>`
-    ).join('')}
-                    </select>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Lip Effects -->
-        <div class="ui-section collapsible">
-            <h3 class="section-header" data-target="lipstickControls">
-                Lipstick <span class="collapse-icon">▼</span>
-            </h3>
-            <div class="section-content" id="lipstickControls">
-                <label class="toggle-label">
-                    <input type="checkbox" id="lipstickEnabled" checked>
-                    <span>Enable Lipstick</span>
-                </label>
-                <div class="control-group">
-                    <label>Color</label>
-                    <div class="color-picker-row">
-                        <input type="color" id="lipstickColor" value="#CC3366">
-                        <div class="color-presets" id="lipstickPresets"></div>
-                    </div>
-                </div>
-                <div class="control-group">
-                    <label>Opacity <span id="lipstickOpacityValue">50%</span></label>
-                    <input type="range" id="lipstickOpacity" min="0" max="100" value="50">
-                </div>
-                <div class="control-group">
-                    <label>Blend Mode</label>
-                    <select id="lipstickBlendMode">
-                        ${BLEND_MODES.map(m =>
-        `<option value="${m.value}" ${m.value === 'multiply' ? 'selected' : ''}>${m.label}</option>`
-    ).join('')}
-                    </select>
+                
+                <div class="slider-row">
+                    <label>Saturation</label>
+                    <input type="range" id="globalSaturation" min="0" max="100" value="100">
+                    <span class="value-display" id="saturationValue">100%</span>
                 </div>
             </div>
         </div>
     `;
 
     statusElement = document.getElementById('statusText');
-    setupEventListeners();
-    setupColorPresets();
-    setupCollapsibles();
-    console.log('UI module initialized');
 }
 
+/**
+ * Setup event listeners
+ */
 function setupEventListeners() {
-    // Debug toggle
-    document.getElementById('debugToggle').addEventListener('change', (e) => {
-        if (appInstance) appInstance.setDebugMode(e.target.checked);
+    // Effect toggles
+    document.querySelectorAll('.effect-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const effect = e.target.dataset.effect;
+            toggleEffect(effect);
+            e.target.classList.toggle('active');
+        });
     });
 
-    // Skin Smoothing
-    document.getElementById('skinSmoothingEnabled')?.addEventListener('change', (e) => {
-        if (appInstance) appInstance.setMakeup('skinSmoothing', { enabled: e.target.checked });
+    // Preset selector
+    document.getElementById('presetSelector')?.addEventListener('change', (e) => {
+        applyPreset(e.target.value);
     });
 
-    document.getElementById('skinSmoothingStrength')?.addEventListener('input', (e) => {
+    // Global sliders
+    setupSlider('globalOpacity', 'opacityValue', (value) => {
+        uiState.opacity = value / 100;
+        applyGlobalSettings();
+    });
+
+    setupSlider('globalIntensity', 'intensityValue', (value) => {
+        uiState.intensity = value / 100;
+        applyGlobalSettings();
+    });
+
+    setupSlider('globalSaturation', 'saturationValue', (value) => {
+        uiState.saturation = value / 100;
+        applyGlobalSettings();
+    });
+}
+
+/**
+ * Setup individual slider
+ */
+function setupSlider(sliderId, displayId, onChange) {
+    const slider = document.getElementById(sliderId);
+    const display = document.getElementById(displayId);
+
+    if (!slider) return;
+
+    slider.addEventListener('input', (e) => {
         const value = parseInt(e.target.value);
-        document.getElementById('skinSmoothingStrengthValue').textContent = `${value}%`;
-        if (appInstance) appInstance.setMakeup('skinSmoothing', { strength: value / 100 });
-    });
-
-    document.getElementById('skinSmoothingTexture')?.addEventListener('input', (e) => {
-        const value = parseInt(e.target.value);
-        document.getElementById('skinSmoothingTextureValue').textContent = `${value}%`;
-        if (appInstance) appInstance.setMakeup('skinSmoothing', { preserveTexture: value / 100 });
-    });
-
-    // Blush
-    setupEffectListeners('blush', ['enabled', 'color', 'opacity']);
-
-    // Contour
-    setupEffectListeners('contour', ['enabled', 'color', 'opacity']);
-
-    // Highlight
-    setupEffectListeners('highlight', ['enabled', 'color', 'opacity']);
-
-    // Eyeshadow
-    setupEffectListeners('eyeshadow', ['enabled', 'color', 'opacity']);
-
-    // Eyeliner
-    setupEffectListeners('eyeliner', ['enabled', 'color', 'thickness', 'style']);
-
-    // Lipstick
-    setupEffectListeners('lipstick', ['enabled', 'color', 'opacity', 'blendMode']);
-}
-
-function setupEffectListeners(effectName, controls) {
-    const prefix = effectName;
-
-    if (controls.includes('enabled')) {
-        document.getElementById(`${prefix}Enabled`)?.addEventListener('change', (e) => {
-            if (appInstance) appInstance.setMakeup(effectName, { enabled: e.target.checked });
-        });
-    }
-
-    if (controls.includes('color')) {
-        document.getElementById(`${prefix}Color`)?.addEventListener('input', (e) => {
-            if (appInstance) appInstance.setMakeup(effectName, { color: e.target.value });
-        });
-    }
-
-    if (controls.includes('opacity')) {
-        document.getElementById(`${prefix}Opacity`)?.addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            const valueEl = document.getElementById(`${prefix}OpacityValue`);
-            if (valueEl) valueEl.textContent = `${value}%`;
-            if (appInstance) appInstance.setMakeup(effectName, { opacity: value / 100 });
-        });
-    }
-
-    if (controls.includes('thickness')) {
-        document.getElementById(`${prefix}Thickness`)?.addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            const valueEl = document.getElementById(`${prefix}ThicknessValue`);
-            if (valueEl) valueEl.textContent = `${value}px`;
-            if (appInstance) appInstance.setMakeup(effectName, { thickness: value });
-        });
-    }
-
-    if (controls.includes('style')) {
-        document.getElementById(`${prefix}Style`)?.addEventListener('change', (e) => {
-            if (appInstance) appInstance.setMakeup(effectName, { style: e.target.value });
-        });
-    }
-
-    if (controls.includes('blendMode')) {
-        document.getElementById(`${prefix}BlendMode`)?.addEventListener('change', (e) => {
-            if (appInstance) appInstance.setMakeup(effectName, { blendMode: e.target.value });
-        });
-    }
-}
-
-function setupColorPresets() {
-    const presetConfigs = [
-        { id: 'blushPresets', colorId: 'blushColor', effect: 'blush', presets: BLUSH_PRESETS },
-        { id: 'contourPresets', colorId: 'contourColor', effect: 'contour', presets: CONTOUR_PRESETS },
-        { id: 'highlightPresets', colorId: 'highlightColor', effect: 'highlight', presets: HIGHLIGHT_PRESETS },
-        { id: 'eyeshadowPresets', colorId: 'eyeshadowColor', effect: 'eyeshadow', presets: EYESHADOW_PRESETS },
-        { id: 'eyelinerPresets', colorId: 'eyelinerColor', effect: 'eyeliner', presets: EYELINER_COLORS },
-        { id: 'lipstickPresets', colorId: 'lipstickColor', effect: 'lipstick', presets: LIPSTICK_PRESETS }
-    ];
-
-    presetConfigs.forEach(({ id, colorId, effect, presets }) => {
-        const container = document.getElementById(id);
-        const colorInput = document.getElementById(colorId);
-        if (!container || !colorInput) return;
-
-        presets.forEach(preset => {
-            const swatch = document.createElement('button');
-            swatch.className = 'color-swatch';
-            swatch.style.backgroundColor = preset.color;
-            swatch.title = preset.name;
-            swatch.addEventListener('click', () => {
-                colorInput.value = preset.color;
-                if (appInstance) appInstance.setMakeup(effect, { color: preset.color });
-            });
-            container.appendChild(swatch);
-        });
+        if (display) display.textContent = `${value}%`;
+        onChange(value);
     });
 }
 
-function setupCollapsibles() {
-    document.querySelectorAll('.section-header').forEach(header => {
-        header.addEventListener('click', () => {
-            const targetId = header.dataset.target;
-            const content = document.getElementById(targetId);
-            const icon = header.querySelector('.collapse-icon');
-            if (content) {
-                content.classList.toggle('collapsed');
-                if (icon) icon.textContent = content.classList.contains('collapsed') ? '▶' : '▼';
-            }
-        });
-    });
+/**
+ * Toggle effect on/off
+ */
+function toggleEffect(effect) {
+    if (!appInstance) return;
+
+    switch (effect) {
+        case 'lips':
+            uiState.lipsEnabled = !uiState.lipsEnabled;
+            appInstance.setMakeup('lipstick', { enabled: uiState.lipsEnabled });
+            break;
+        case 'eyes':
+            uiState.eyesEnabled = !uiState.eyesEnabled;
+            appInstance.setMakeup('eyeliner', { enabled: uiState.eyesEnabled });
+            appInstance.setMakeup('eyeshadow', { enabled: uiState.eyesEnabled });
+            break;
+        case 'face':
+            uiState.faceEnabled = !uiState.faceEnabled;
+            appInstance.setMakeup('blush', { enabled: uiState.faceEnabled });
+            appInstance.setMakeup('contour', { enabled: uiState.faceEnabled });
+            appInstance.setMakeup('highlight', { enabled: uiState.faceEnabled });
+            appInstance.setMakeup('skinSmoothing', { enabled: uiState.faceEnabled });
+            break;
+    }
 }
 
+/**
+ * Apply global settings to all effects
+ */
+function applyGlobalSettings() {
+    if (!appInstance) return;
+
+    const settings = {
+        opacity: uiState.opacity,
+        intensity: uiState.saturation
+    };
+
+    // Apply to all active effects
+    if (uiState.lipsEnabled) {
+        appInstance.setMakeup('lipstick', settings);
+    }
+    if (uiState.eyesEnabled) {
+        appInstance.setMakeup('eyeliner', { opacity: uiState.opacity });
+        appInstance.setMakeup('eyeshadow', settings);
+    }
+    if (uiState.faceEnabled) {
+        appInstance.setMakeup('blush', settings);
+        appInstance.setMakeup('contour', { opacity: uiState.opacity });
+        appInstance.setMakeup('highlight', { opacity: uiState.opacity });
+    }
+}
+
+/**
+ * Apply preset configuration
+ */
+function applyPreset(presetName) {
+    if (!appInstance) return;
+
+    const presets = {
+        natural: { opacity: 30, intensity: 80, saturation: 70 },
+        glam: { opacity: 70, intensity: 100, saturation: 100 },
+        bold: { opacity: 80, intensity: 100, saturation: 120 },
+        subtle: { opacity: 20, intensity: 60, saturation: 80 },
+        custom: null
+    };
+
+    const preset = presets[presetName];
+    if (!preset) return;
+
+    // Update sliders
+    updateSlider('globalOpacity', 'opacityValue', preset.opacity);
+    updateSlider('globalIntensity', 'intensityValue', preset.intensity);
+    updateSlider('globalSaturation', 'saturationValue', preset.saturation);
+
+    // Update state
+    uiState.opacity = preset.opacity / 100;
+    uiState.intensity = preset.intensity / 100;
+    uiState.saturation = preset.saturation / 100;
+
+    applyGlobalSettings();
+}
+
+/**
+ * Update slider value
+ */
+function updateSlider(sliderId, displayId, value) {
+    const slider = document.getElementById(sliderId);
+    const display = document.getElementById(displayId);
+
+    if (slider) slider.value = value;
+    if (display) display.textContent = `${value}%`;
+}
+
+/**
+ * Update status message
+ */
 export function updateStatus(message) {
-    if (statusElement) statusElement.textContent = message;
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
     console.log(`Status: ${message}`);
 }
 
-export default { initUI, updateStatus };
+/**
+ * Get current UI state (for external access)
+ */
+export function getUIState() {
+    return { ...uiState };
+}
+
+export default { initUI, updateStatus, getUIState };
