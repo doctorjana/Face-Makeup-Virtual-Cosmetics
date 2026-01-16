@@ -11,8 +11,8 @@
 
 import { loadImage, getSafeDimensions, getFitDimensions } from './image/index.js';
 import { getDetector, FaceMeshDetector } from './facemesh/index.js';
-import { drawDebugLandmarks, setDebug, DEBUG } from './render/index.js';
-import { MaskGenerator, applyColorWithMask } from './render/masks.js';
+import { drawDebugLandmarks, setDebug } from './render/index.js';
+import { LipstickEffect } from './effects/lipstick.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -31,13 +31,9 @@ class FaceMakeupApp {
         // FaceMesh detector
         this.detector = getDetector();
 
-        // Mask generator
-        this.maskGenerator = null;
-
-        // Makeup settings
-        this.makeup = {
-            lipstick: { enabled: true, color: '#CC3366', opacity: 0.4 },
-            blush: { enabled: false, color: '#FF9999', opacity: 0.2 }
+        // Makeup effects
+        this.effects = {
+            lipstick: new LipstickEffect()
         };
     }
 
@@ -135,13 +131,7 @@ class FaceMakeupApp {
                 console.log(`Detected ${this.faceLandmarks.length} landmarks`);
                 updateStatus(`Face detected - ${this.faceLandmarks.length} landmarks`);
 
-                // Initialize mask generator with current canvas size
-                this.maskGenerator = new MaskGenerator(this.canvas.width, this.canvas.height);
-
-                // Generate masks for makeup regions
-                this.generateMasks();
-
-                // Draw landmarks overlay and makeup
+                // Draw overlays
                 this.drawOverlays();
             } else {
                 this.faceLandmarks = null;
@@ -152,20 +142,6 @@ class FaceMakeupApp {
             console.error('Face detection failed:', error);
             updateStatus('Face detection failed');
         }
-    }
-
-    generateMasks() {
-        if (!this.faceLandmarks || !this.maskGenerator) return;
-
-        // Generate masks for lips with feathering
-        this.maskGenerator.generate(this.faceLandmarks, 'upperLip', this.imageScale, { featherRadius: 2 });
-        this.maskGenerator.generate(this.faceLandmarks, 'lowerLip', this.imageScale, { featherRadius: 2 });
-
-        // Generate masks for cheeks (blush)
-        this.maskGenerator.generate(this.faceLandmarks, 'leftCheek', this.imageScale, { featherRadius: 8 });
-        this.maskGenerator.generate(this.faceLandmarks, 'rightCheek', this.imageScale, { featherRadius: 8 });
-
-        console.log('Masks generated');
     }
 
     renderImage() {
@@ -216,76 +192,38 @@ class FaceMakeupApp {
     drawOverlays() {
         if (!this.faceLandmarks) return;
 
-        // Apply makeup effects first (under debug overlay)
+        // Apply makeup effects
         this.applyMakeup();
 
-        // Draw debug landmarks with color coding
+        // Draw debug landmarks (on top of makeup)
         drawDebugLandmarks(this.ctx, this.faceLandmarks, this.imageScale);
     }
 
     /**
-     * Apply makeup effects using generated masks
+     * Apply all makeup effects
      */
     applyMakeup() {
-        if (!this.maskGenerator) return;
+        const { width, height } = this.canvas;
 
         // Apply lipstick
-        if (this.makeup.lipstick.enabled) {
-            const upperLipMask = this.maskGenerator.get('upperLip');
-            const lowerLipMask = this.maskGenerator.get('lowerLip');
-
-            if (upperLipMask) {
-                applyColorWithMask(
-                    this.ctx,
-                    upperLipMask,
-                    this.makeup.lipstick.color,
-                    this.makeup.lipstick.opacity,
-                    'multiply'
-                );
-            }
-            if (lowerLipMask) {
-                applyColorWithMask(
-                    this.ctx,
-                    lowerLipMask,
-                    this.makeup.lipstick.color,
-                    this.makeup.lipstick.opacity,
-                    'multiply'
-                );
-            }
-        }
-
-        // Apply blush
-        if (this.makeup.blush.enabled) {
-            const leftCheekMask = this.maskGenerator.get('leftCheek');
-            const rightCheekMask = this.maskGenerator.get('rightCheek');
-
-            if (leftCheekMask) {
-                applyColorWithMask(
-                    this.ctx,
-                    leftCheekMask,
-                    this.makeup.blush.color,
-                    this.makeup.blush.opacity,
-                    'multiply'
-                );
-            }
-            if (rightCheekMask) {
-                applyColorWithMask(
-                    this.ctx,
-                    rightCheekMask,
-                    this.makeup.blush.color,
-                    this.makeup.blush.opacity,
-                    'multiply'
-                );
-            }
-        }
+        this.effects.lipstick.apply(
+            this.ctx,
+            this.faceLandmarks,
+            width,
+            height,
+            this.imageScale
+        );
     }
 
     /**
-     * Update makeup settings and redraw
+     * Update makeup settings
+     * @param {string} effectName - Name of the effect (e.g., 'lipstick')
+     * @param {Object} settings - Settings to update
      */
-    setMakeup(type, settings) {
-        if (this.makeup[type]) {
-            Object.assign(this.makeup[type], settings);
+    setMakeup(effectName, settings) {
+        const effect = this.effects[effectName];
+        if (effect) {
+            effect.update(settings);
             if (this.currentImage && this.faceLandmarks) {
                 this.redraw();
             }
@@ -297,13 +235,6 @@ class FaceMakeupApp {
      */
     redraw() {
         this.renderImage();
-
-        // Regenerate masks if needed
-        if (this.faceLandmarks && this.maskGenerator) {
-            this.maskGenerator.resize(this.canvas.width, this.canvas.height);
-            this.generateMasks();
-        }
-
         this.drawOverlays();
     }
 
@@ -355,6 +286,16 @@ class FaceMakeupApp {
             displayHeight: this.canvas.height,
             scale: this.imageScale,
             landmarks: this.faceLandmarks
+        };
+    }
+
+    /**
+     * Get current makeup settings
+     * @returns {Object}
+     */
+    getMakeupSettings() {
+        return {
+            lipstick: this.effects.lipstick.getSettings()
         };
     }
 }
