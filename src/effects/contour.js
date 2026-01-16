@@ -1,11 +1,14 @@
 /**
  * Contour Effect Module
  * 
- * Applies contouring shadows to jawline and nose for face shaping.
- * Uses soft gradients for realistic appearance.
+ * Applies contouring shadows to sculpt the face:
+ * - Under cheekbones (hollows)
+ * - Sides of nose
+ * - Temples
+ * - Under jawline
  */
 
-import { getRegionPath, createPath2D } from '../facemesh/landmarks.js';
+import { getRegionPath } from '../facemesh/landmarks.js';
 
 /**
  * Default contour settings
@@ -13,9 +16,9 @@ import { getRegionPath, createPath2D } from '../facemesh/landmarks.js';
 export const DEFAULT_CONTOUR = {
     enabled: false,
     color: '#8B6B5B',      // Warm brown shadow
-    opacity: 0.2,
-    intensity: 0.7,
-    featherRadius: 10,
+    opacity: 0.25,
+    intensity: 0.8,
+    featherRadius: 12,
     blendMode: 'multiply'
 };
 
@@ -31,43 +34,107 @@ export const CONTOUR_PRESETS = [
 ];
 
 /**
- * Draw contour on one side of face
+ * Cheekbone hollow landmarks - under the cheekbones
+ * These create the sculpted look
  */
-function drawContourRegion(ctx, points, color, opacity, featherRadius) {
+const LEFT_CHEEK_HOLLOW = [234, 227, 137, 177, 215, 138, 135, 169, 170, 140];
+const RIGHT_CHEEK_HOLLOW = [454, 447, 366, 401, 435, 367, 364, 394, 395, 369];
+
+/**
+ * Temple area landmarks
+ */
+const LEFT_TEMPLE = [54, 103, 67, 109, 10];
+const RIGHT_TEMPLE = [284, 332, 297, 338, 10];
+
+/**
+ * Nose side landmarks for definition
+ */
+const LEFT_NOSE_SIDE = [236, 198, 131, 49, 129];
+const RIGHT_NOSE_SIDE = [456, 420, 360, 279, 358];
+
+/**
+ * Get landmark points scaled
+ */
+function getPoints(landmarks, indices, scale) {
+    return indices
+        .filter(idx => idx < landmarks.length && landmarks[idx])
+        .map(idx => ({
+            x: landmarks[idx].x * scale,
+            y: landmarks[idx].y * scale
+        }));
+}
+
+/**
+ * Draw contour shadow with soft gradient
+ */
+function drawContourShadow(ctx, points, color, opacity, featherRadius) {
     if (points.length < 3) return;
 
-    // Create gradient from edge inward
     const minX = Math.min(...points.map(p => p.x));
     const maxX = Math.max(...points.map(p => p.x));
     const minY = Math.min(...points.map(p => p.y));
     const maxY = Math.max(...points.map(p => p.y));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-
-    // Create path
-    const path = createPath2D(points, true);
+    const radiusX = (maxX - minX) / 2 + featherRadius;
+    const radiusY = (maxY - minY) / 2 + featherRadius;
+    const radius = Math.max(radiusX, radiusY);
 
     ctx.save();
     ctx.globalAlpha = opacity;
     ctx.globalCompositeOperation = 'multiply';
 
-    // Create radial gradient for soft falloff
-    const radius = Math.max(maxX - minX, maxY - minY) / 2;
-    const gradient = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, radius
-    );
-    gradient.addColorStop(0, `${color}00`);  // Transparent center
-    gradient.addColorStop(0.5, `${color}40`); // Subtle middle
-    gradient.addColorStop(1, color);          // Full color at edge
+    // Create path from points
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
 
-    ctx.fillStyle = gradient;
-    ctx.fill(path);
+    // Apply blur for soft edges
+    ctx.filter = `blur(${featherRadius}px)`;
+    ctx.fillStyle = color;
+    ctx.fill();
+
     ctx.restore();
 }
 
 /**
- * Apply contour effect to jawline and nose
+ * Draw nose contour lines
+ */
+function drawNoseContour(ctx, leftPoints, rightPoints, color, opacity, featherRadius) {
+    if (leftPoints.length < 2 || rightPoints.length < 2) return;
+
+    ctx.save();
+    ctx.globalAlpha = opacity * 0.6;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.filter = `blur(${featherRadius / 2}px)`;
+
+    // Left side of nose
+    ctx.beginPath();
+    ctx.moveTo(leftPoints[0].x, leftPoints[0].y);
+    for (let i = 1; i < leftPoints.length; i++) {
+        ctx.lineTo(leftPoints[i].x, leftPoints[i].y);
+    }
+    ctx.stroke();
+
+    // Right side of nose
+    ctx.beginPath();
+    ctx.moveTo(rightPoints[0].x, rightPoints[0].y);
+    for (let i = 1; i < rightPoints.length; i++) {
+        ctx.lineTo(rightPoints[i].x, rightPoints[i].y);
+    }
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Apply contour effect
  */
 export function applyContour(ctx, landmarks, width, height, scale, settings = {}) {
     const config = { ...DEFAULT_CONTOUR, ...settings };
@@ -78,34 +145,25 @@ export function applyContour(ctx, landmarks, width, height, scale, settings = {}
 
     const opacity = config.opacity * config.intensity;
 
-    // Contour the lower jaw / jawline sides
-    const lowerJaw = getRegionPath(landmarks, 'lowerJaw', scale);
-    if (lowerJaw.length > 0) {
-        drawContourRegion(ctx, lowerJaw, config.color, opacity * 0.6, config.featherRadius);
-    }
+    // Contour cheek hollows (main contour area)
+    const leftCheekHollow = getPoints(landmarks, LEFT_CHEEK_HOLLOW, scale);
+    const rightCheekHollow = getPoints(landmarks, RIGHT_CHEEK_HOLLOW, scale);
 
-    // Contour nose sides
-    const noseBridge = getRegionPath(landmarks, 'noseBridge', scale);
-    if (noseBridge.length > 0) {
-        // Draw subtle shadow on both sides of nose
-        ctx.save();
-        ctx.globalAlpha = opacity * 0.4;
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = config.color;
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
+    drawContourShadow(ctx, leftCheekHollow, config.color, opacity, config.featherRadius);
+    drawContourShadow(ctx, rightCheekHollow, config.color, opacity, config.featherRadius);
 
-        // Apply blur for soft edge
-        ctx.filter = `blur(${config.featherRadius / 2}px)`;
+    // Contour temples (subtle)
+    const leftTemple = getPoints(landmarks, LEFT_TEMPLE, scale);
+    const rightTemple = getPoints(landmarks, RIGHT_TEMPLE, scale);
 
-        ctx.beginPath();
-        ctx.moveTo(noseBridge[0].x, noseBridge[0].y);
-        for (let i = 1; i < noseBridge.length; i++) {
-            ctx.lineTo(noseBridge[i].x, noseBridge[i].y);
-        }
-        ctx.stroke();
-        ctx.restore();
-    }
+    drawContourShadow(ctx, leftTemple, config.color, opacity * 0.5, config.featherRadius);
+    drawContourShadow(ctx, rightTemple, config.color, opacity * 0.5, config.featherRadius);
+
+    // Nose contour
+    const leftNose = getPoints(landmarks, LEFT_NOSE_SIDE, scale);
+    const rightNose = getPoints(landmarks, RIGHT_NOSE_SIDE, scale);
+
+    drawNoseContour(ctx, leftNose, rightNose, config.color, opacity, config.featherRadius);
 }
 
 /**
