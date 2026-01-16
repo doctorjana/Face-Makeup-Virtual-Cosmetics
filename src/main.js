@@ -15,6 +15,9 @@ import { drawDebugLandmarks, setDebug } from './render/index.js';
 import { LipstickEffect } from './effects/lipstick.js';
 import { EyelinerEffect } from './effects/eyeliner.js';
 import { EyeshadowEffect } from './effects/eyeshadow.js';
+import { BlushEffect } from './effects/blush.js';
+import { ContourEffect } from './effects/contour.js';
+import { HighlightEffect } from './effects/highlight.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -33,8 +36,11 @@ class FaceMakeupApp {
         // FaceMesh detector
         this.detector = getDetector();
 
-        // Makeup effects
+        // Makeup effects (order matters for layering)
         this.effects = {
+            contour: new ContourEffect(),
+            highlight: new HighlightEffect(),
+            blush: new BlushEffect(),
             eyeshadow: new EyeshadowEffect(),
             eyeliner: new EyelinerEffect(),
             lipstick: new LipstickEffect()
@@ -196,7 +202,7 @@ class FaceMakeupApp {
     drawOverlays() {
         if (!this.faceLandmarks) return;
 
-        // Apply makeup effects (order matters for layering)
+        // Apply makeup effects in correct order (back to front)
         this.applyMakeup();
 
         // Draw debug landmarks (on top of makeup)
@@ -209,38 +215,21 @@ class FaceMakeupApp {
     applyMakeup() {
         const { width, height } = this.canvas;
 
-        // Apply eyeshadow first (behind eyeliner)
-        this.effects.eyeshadow.apply(
-            this.ctx,
-            this.faceLandmarks,
-            width,
-            height,
-            this.imageScale
-        );
+        // Face effects first (contour, highlight, blush)
+        this.effects.contour.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.highlight.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.blush.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
 
-        // Apply eyeliner
-        this.effects.eyeliner.apply(
-            this.ctx,
-            this.faceLandmarks,
-            width,
-            height,
-            this.imageScale
-        );
+        // Eye effects
+        this.effects.eyeshadow.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
+        this.effects.eyeliner.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
 
-        // Apply lipstick
-        this.effects.lipstick.apply(
-            this.ctx,
-            this.faceLandmarks,
-            width,
-            height,
-            this.imageScale
-        );
+        // Lip effects last
+        this.effects.lipstick.apply(this.ctx, this.faceLandmarks, width, height, this.imageScale);
     }
 
     /**
      * Update makeup settings
-     * @param {string} effectName - Name of the effect
-     * @param {Object} settings - Settings to update
      */
     setMakeup(effectName, settings) {
         const effect = this.effects[effectName];
@@ -262,7 +251,6 @@ class FaceMakeupApp {
 
     /**
      * Toggle debug mode
-     * @param {boolean} enabled
      */
     setDebugMode(enabled) {
         setDebug(enabled);
@@ -296,7 +284,6 @@ class FaceMakeupApp {
 
     /**
      * Get current image info
-     * @returns {Object|null}
      */
     getImageInfo() {
         if (!this.currentImage) return null;
@@ -313,14 +300,13 @@ class FaceMakeupApp {
 
     /**
      * Get current makeup settings
-     * @returns {Object}
      */
     getMakeupSettings() {
-        return {
-            lipstick: this.effects.lipstick.getSettings(),
-            eyeliner: this.effects.eyeliner.getSettings(),
-            eyeshadow: this.effects.eyeshadow.getSettings()
-        };
+        const settings = {};
+        for (const [name, effect] of Object.entries(this.effects)) {
+            settings[name] = effect.getSettings();
+        }
+        return settings;
     }
 }
 
