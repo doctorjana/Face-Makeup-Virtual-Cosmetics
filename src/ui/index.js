@@ -5,22 +5,35 @@
  * Handles sidebar controls, color pickers, sliders, etc.
  */
 
+let statusElement = null;
+
 export function initUI() {
     const sidebar = document.getElementById('sidebar');
 
-    // Placeholder UI initialization
     sidebar.innerHTML = `
         <div class="ui-section">
+            <h3>Status</h3>
+            <p class="status-text" id="statusText">Initializing...</p>
+        </div>
+        <div class="ui-section">
             <h3>Makeup Controls</h3>
-            <p class="ui-placeholder">Load an image to begin</p>
+            <p class="ui-placeholder">Detect a face to enable controls</p>
         </div>
     `;
 
+    statusElement = document.getElementById('statusText');
     console.log('UI module initialized');
+}
+
+export function updateStatus(message) {
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
+    console.log(`Status: ${message}`);
 }
 
 export function updateUI(state) {
     // TODO: Update UI based on application state
 }
 
-export default { initUI, updateUI };
+export default { initUI, updateStatus, updateUI };
