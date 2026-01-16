@@ -43,14 +43,8 @@ export const EYELINER_COLORS = [
 
 /**
  * Draw eyeliner on one eye
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array} landmarks - Pixel coordinates
- * @param {string} eyeRegion - 'leftEyeUpper' or 'rightEyeUpper'
- * @param {number} scale
- * @param {Object} config
  */
-function drawEyelinerLine(ctx, landmarks, eyeRegion, scale, config) {
+function drawEyelinerLine(ctx, landmarks, eyeRegion, scale, config, faceCenter) {
     const points = getRegionPath(landmarks, eyeRegion, scale);
 
     if (points.length < 3) return;
@@ -75,33 +69,46 @@ function drawEyelinerLine(ctx, landmarks, eyeRegion, scale, config) {
         ctx.shadowBlur = config.smudge * 3;
     }
 
-    // Draw the eyeliner path
+    // Find outer corner by checking which endpoint is FURTHER from face center
+    const firstPoint = points[0];
+    const lastPoint = points[points.length - 1];
+
+    const distFirst = Math.abs(firstPoint.x - faceCenter.x);
+    const distLast = Math.abs(lastPoint.x - faceCenter.x);
+
+    // Outer corner is the one FURTHER from center
+    const outerIdx = distFirst > distLast ? 0 : points.length - 1;
+    const innerIdx = outerIdx === 0 ? points.length - 1 : 0;
+
+    const outerCorner = points[outerIdx];
+    const innerCorner = points[innerIdx];
+
+    // Draw from inner to outer corner
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    ctx.moveTo(innerCorner.x, innerCorner.y);
+
+    // Order points from inner to outer
+    const drawOrder = innerIdx === 0 ? points : [...points].reverse();
 
     // Use quadratic curves for smooth line
-    for (let i = 1; i < points.length - 1; i++) {
-        const xc = (points[i].x + points[i + 1].x) / 2;
-        const yc = (points[i].y + points[i + 1].y) / 2;
-        ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+    for (let i = 1; i < drawOrder.length - 1; i++) {
+        const xc = (drawOrder[i].x + drawOrder[i + 1].x) / 2;
+        const yc = (drawOrder[i].y + drawOrder[i + 1].y) / 2;
+        ctx.quadraticCurveTo(drawOrder[i].x, drawOrder[i].y, xc, yc);
     }
 
-    // Last point
-    const lastPoint = points[points.length - 1];
-    ctx.lineTo(lastPoint.x, lastPoint.y);
+    // Draw to outer corner
+    ctx.lineTo(outerCorner.x, outerCorner.y);
 
-    // Add wing if style is winged
+    // Add wing at outer corner if style is winged
     if (config.style === 'winged') {
-        // Calculate wing direction (outward and upward)
-        const secondLast = points[points.length - 2];
-        const dx = lastPoint.x - secondLast.x;
-        const dy = lastPoint.y - secondLast.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-
-        // Wing extends outward and upward
         const wingLength = thickness * 4;
-        const wingX = lastPoint.x + (dx / len) * wingLength - (dy / len) * wingLength * 0.5;
-        const wingY = lastPoint.y + (dy / len) * wingLength * 0.3 - wingLength * 0.7;
+
+        // Wing direction: AWAY from face center (lateral) and upward
+        const outwardX = outerCorner.x > faceCenter.x ? 1 : -1;
+
+        const wingX = outerCorner.x + outwardX * wingLength * 0.8;
+        const wingY = outerCorner.y - wingLength * 0.6;
 
         ctx.lineTo(wingX, wingY);
     }
@@ -112,13 +119,6 @@ function drawEyelinerLine(ctx, landmarks, eyeRegion, scale, config) {
 
 /**
  * Apply eyeliner effect to both eyes
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array} landmarks
- * @param {number} width
- * @param {number} height
- * @param {number} scale
- * @param {Object} settings
  */
 export function applyEyeliner(ctx, landmarks, width, height, scale, settings = {}) {
     const config = { ...DEFAULT_EYELINER, ...settings };
@@ -127,9 +127,16 @@ export function applyEyeliner(ctx, landmarks, width, height, scale, settings = {
         return;
     }
 
+    // Calculate face center using nose tip (landmark 4) 
+    const noseTip = landmarks[4];
+    const faceCenter = {
+        x: noseTip.x * scale,
+        y: noseTip.y * scale
+    };
+
     // Draw eyeliner on both eyes
-    drawEyelinerLine(ctx, landmarks, 'leftEyeUpper', scale, config);
-    drawEyelinerLine(ctx, landmarks, 'rightEyeUpper', scale, config);
+    drawEyelinerLine(ctx, landmarks, 'leftEyeUpper', scale, config, faceCenter);
+    drawEyelinerLine(ctx, landmarks, 'rightEyeUpper', scale, config, faceCenter);
 }
 
 /**
