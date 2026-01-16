@@ -12,6 +12,7 @@
 import { loadImage, getSafeDimensions, getFitDimensions } from './image/index.js';
 import { getDetector, FaceMeshDetector } from './facemesh/index.js';
 import { drawDebugLandmarks, setDebug, DEBUG } from './render/index.js';
+import { MaskGenerator, applyColorWithMask } from './render/masks.js';
 import { initUI, updateStatus } from './ui/index.js';
 
 class FaceMakeupApp {
@@ -29,6 +30,15 @@ class FaceMakeupApp {
 
         // FaceMesh detector
         this.detector = getDetector();
+
+        // Mask generator
+        this.maskGenerator = null;
+
+        // Makeup settings
+        this.makeup = {
+            lipstick: { enabled: true, color: '#CC3366', opacity: 0.4 },
+            blush: { enabled: false, color: '#FF9999', opacity: 0.2 }
+        };
     }
 
     async init() {
@@ -125,7 +135,13 @@ class FaceMakeupApp {
                 console.log(`Detected ${this.faceLandmarks.length} landmarks`);
                 updateStatus(`Face detected - ${this.faceLandmarks.length} landmarks`);
 
-                // Draw landmarks overlay
+                // Initialize mask generator with current canvas size
+                this.maskGenerator = new MaskGenerator(this.canvas.width, this.canvas.height);
+
+                // Generate masks for makeup regions
+                this.generateMasks();
+
+                // Draw landmarks overlay and makeup
                 this.drawOverlays();
             } else {
                 this.faceLandmarks = null;
@@ -136,6 +152,20 @@ class FaceMakeupApp {
             console.error('Face detection failed:', error);
             updateStatus('Face detection failed');
         }
+    }
+
+    generateMasks() {
+        if (!this.faceLandmarks || !this.maskGenerator) return;
+
+        // Generate masks for lips with feathering
+        this.maskGenerator.generate(this.faceLandmarks, 'upperLip', this.imageScale, { featherRadius: 2 });
+        this.maskGenerator.generate(this.faceLandmarks, 'lowerLip', this.imageScale, { featherRadius: 2 });
+
+        // Generate masks for cheeks (blush)
+        this.maskGenerator.generate(this.faceLandmarks, 'leftCheek', this.imageScale, { featherRadius: 8 });
+        this.maskGenerator.generate(this.faceLandmarks, 'rightCheek', this.imageScale, { featherRadius: 8 });
+
+        console.log('Masks generated');
     }
 
     renderImage() {
@@ -181,13 +211,85 @@ class FaceMakeupApp {
     }
 
     /**
-     * Draw all overlays (debug landmarks, makeup effects, etc.)
+     * Draw all overlays (makeup effects, debug landmarks, etc.)
      */
     drawOverlays() {
         if (!this.faceLandmarks) return;
 
+        // Apply makeup effects first (under debug overlay)
+        this.applyMakeup();
+
         // Draw debug landmarks with color coding
         drawDebugLandmarks(this.ctx, this.faceLandmarks, this.imageScale);
+    }
+
+    /**
+     * Apply makeup effects using generated masks
+     */
+    applyMakeup() {
+        if (!this.maskGenerator) return;
+
+        // Apply lipstick
+        if (this.makeup.lipstick.enabled) {
+            const upperLipMask = this.maskGenerator.get('upperLip');
+            const lowerLipMask = this.maskGenerator.get('lowerLip');
+
+            if (upperLipMask) {
+                applyColorWithMask(
+                    this.ctx,
+                    upperLipMask,
+                    this.makeup.lipstick.color,
+                    this.makeup.lipstick.opacity,
+                    'multiply'
+                );
+            }
+            if (lowerLipMask) {
+                applyColorWithMask(
+                    this.ctx,
+                    lowerLipMask,
+                    this.makeup.lipstick.color,
+                    this.makeup.lipstick.opacity,
+                    'multiply'
+                );
+            }
+        }
+
+        // Apply blush
+        if (this.makeup.blush.enabled) {
+            const leftCheekMask = this.maskGenerator.get('leftCheek');
+            const rightCheekMask = this.maskGenerator.get('rightCheek');
+
+            if (leftCheekMask) {
+                applyColorWithMask(
+                    this.ctx,
+                    leftCheekMask,
+                    this.makeup.blush.color,
+                    this.makeup.blush.opacity,
+                    'multiply'
+                );
+            }
+            if (rightCheekMask) {
+                applyColorWithMask(
+                    this.ctx,
+                    rightCheekMask,
+                    this.makeup.blush.color,
+                    this.makeup.blush.opacity,
+                    'multiply'
+                );
+            }
+        }
+    }
+
+    /**
+     * Update makeup settings and redraw
+     */
+    setMakeup(type, settings) {
+        if (this.makeup[type]) {
+            Object.assign(this.makeup[type], settings);
+            if (this.currentImage && this.faceLandmarks) {
+                this.redraw();
+            }
+        }
     }
 
     /**
@@ -195,6 +297,13 @@ class FaceMakeupApp {
      */
     redraw() {
         this.renderImage();
+
+        // Regenerate masks if needed
+        if (this.faceLandmarks && this.maskGenerator) {
+            this.maskGenerator.resize(this.canvas.width, this.canvas.height);
+            this.generateMasks();
+        }
+
         this.drawOverlays();
     }
 
