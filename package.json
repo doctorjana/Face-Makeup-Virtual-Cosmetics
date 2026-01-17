@@ -1,0 +1,23 @@
+{
+  "name": "face-makeup-web",
+  "version": "1.0.0",
+  "description": "Virtual face makeup application with realistic cosmetic effects",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "serve",
+    "dev": "serve",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "makeup",
+    "face",
+    "mediapipe",
+    "virtual",
+    "cosmetics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}
