@@ -111,6 +111,17 @@ function renderUI() {
                     <option value="none">❌ None</option>
                 </select>
             </div>
+            
+            <div class="divider"></div>
+            
+            <!-- Export Buttons -->
+            <div class="export-section">
+                <label>Export Image</label>
+                <div class="export-buttons">
+                    <button id="exportPngBtn" class="export-btn">📥 PNG</button>
+                    <button id="exportJpegBtn" class="export-btn">📥 JPEG</button>
+                </div>
+            </div>
         </div>
     `;
 
@@ -318,6 +329,14 @@ function setupEventListeners() {
     document.getElementById('presetSelector')?.addEventListener('change', (e) => {
         applyPreset(e.target.value);
     });
+
+    // Export Buttons
+    document.getElementById('exportPngBtn')?.addEventListener('click', () => {
+        if (appInstance) appInstance.exportImage('png');
+    });
+    document.getElementById('exportJpegBtn')?.addEventListener('click', () => {
+        if (appInstance) appInstance.exportImage('jpeg', 0.92);
+    });
 }
 
 /**
@@ -439,9 +458,24 @@ function applyPreset(presetName) {
     }
 }
 
+export function showLoader(message = 'Processing...') {
+    const loader = document.getElementById('imageLoader');
+    if (loader) {
+        loader.querySelector('.loader-text').textContent = message;
+        loader.style.display = 'flex';
+    }
+}
+
+export function hideLoader() {
+    const loader = document.getElementById('imageLoader');
+    if (loader) {
+        loader.style.display = 'none';
+    }
+}
+
 export function updateStatus(message) {
     if (statusElement) statusElement.textContent = message;
     console.log(`Status: ${message} `);
 }
 
-export default { initUI, updateStatus };
+export default { initUI, updateStatus, showLoader, hideLoader };

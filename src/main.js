@@ -19,7 +19,7 @@ import { BlushEffect } from './effects/blush.js';
 import { ContourEffect } from './effects/contour.js';
 import { HighlightEffect } from './effects/highlight.js';
 import { SkinSmoothingEffect } from './effects/skinSmoothing.js';
-import { initUI, updateStatus } from './ui/index.js';
+import { initUI, updateStatus, showLoader, hideLoader } from './ui/index.js';
 
 class FaceMakeupApp {
     constructor() {
@@ -107,6 +107,7 @@ class FaceMakeupApp {
 
         try {
             updateStatus('Loading image...');
+            showLoader('Loading image...');
             console.log(`Loading image: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
 
             // Load the image
@@ -130,6 +131,8 @@ class FaceMakeupApp {
             console.error('Failed to load image:', error);
             updateStatus(`Error: ${error.message}`);
             this.showError(error.message);
+        } finally {
+            hideLoader();
         }
     }
 
@@ -138,6 +141,7 @@ class FaceMakeupApp {
 
         try {
             updateStatus('Detecting face...');
+            showLoader('Detecting face...');
 
             const result = await this.detector.detect(this.currentImage);
 
@@ -160,6 +164,8 @@ class FaceMakeupApp {
         } catch (error) {
             console.error('Face detection failed:', error);
             updateStatus('Face detection failed');
+        } finally {
+            hideLoader();
         }
     }
 
@@ -387,6 +393,79 @@ class FaceMakeupApp {
             this.canvas.width / 2,
             this.canvas.height / 2
         );
+    }
+
+    /**
+     * Export the image at original resolution with makeup applied
+     * @param {string} format - 'png' or 'jpeg'
+     * @param {number} quality - JPEG quality (0-1), ignored for PNG
+     */
+    async exportImage(format = 'png', quality = 0.92) {
+        if (!this.currentImage || !this.faceLandmarks) {
+            console.error('No image or landmarks to export');
+            return null;
+        }
+
+        showLoader('Processing export...');
+
+        // Create offscreen canvas at original resolution
+        const exportCanvas = document.createElement('canvas');
+        const exportCtx = exportCanvas.getContext('2d');
+
+        const { width, height } = this.originalDimensions;
+        exportCanvas.width = width;
+        exportCanvas.height = height;
+
+        // Draw original image at full resolution
+        exportCtx.drawImage(this.currentImage, 0, 0, width, height);
+
+        // Apply makeup effects at original resolution (scale = 1)
+        if (!this.showOriginal) {
+            // Skin smoothing
+            this.effects.skinSmoothing.apply(
+                exportCtx, this.currentImage, this.faceLandmarks, width, height, 1
+            );
+
+            // Face effects
+            this.effects.contour.apply(exportCtx, this.faceLandmarks, width, height, 1);
+            this.effects.highlight.apply(exportCtx, this.faceLandmarks, width, height, 1);
+            this.effects.blush.apply(exportCtx, this.faceLandmarks, width, height, 1);
+
+            // Eye effects
+            this.effects.eyeshadow.apply(exportCtx, this.faceLandmarks, width, height, 1);
+            this.effects.eyeliner.apply(exportCtx, this.faceLandmarks, width, height, 1);
+
+            // Lip effects
+            this.effects.lipstick.apply(exportCtx, this.faceLandmarks, width, height, 1);
+        }
+
+        // Convert to blob and trigger download
+        const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const extension = format === 'jpeg' ? 'jpg' : 'png';
+
+        return new Promise((resolve) => {
+            exportCanvas.toBlob((blob) => {
+                hideLoader();
+                if (!blob) {
+                    console.error('Failed to create blob');
+                    resolve(null);
+                    return;
+                }
+
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `face-makeup-export.${extension}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                console.log(`Exported ${width}x${height} image as ${format.toUpperCase()}`);
+                resolve(blob);
+            }, mimeType, quality);
+        });
     }
 
     /**
